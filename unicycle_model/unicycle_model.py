@@ -3,7 +3,7 @@ Unicycle Model Class
 """
 import numpy as np
 
-#velocity motion model
+# velocity motion model
 import numpy as np 
 
 class UnicycleModel:
@@ -19,9 +19,15 @@ class UnicycleModel:
         self.x = x
         self.y = y
         self.theta = self.wrapAngle(theta)
+        self.x_dot = 0
+        self.y_dot = 0
+        self.theta_dot = 0
         self.x_prev = x
         self.y_prev = y
         self.theta_prev = theta
+        self.x_dot_prev = self.x_dot
+        self.y_dot_prev = self.y_dot
+        self.theta_dot_prev = self.theta_dot
         self.alpha1 = alpha[0]
         self.alpha2 = alpha[1]
         self.alpha3 = alpha[2]
@@ -30,17 +36,24 @@ class UnicycleModel:
         self.height = height
         self.width = width
     
-    def setState(self,x,y,theta):
+    def setState(self,x,y,theta,x_dot,y_dot,theta_dot):
         self.x = x
         self.y = y
         self.theta = self.wrapAngle(theta)
+        self.x_dot = x_dot
+        self.y_dot = y_dot
+        self.theta_dot = theta_dot
 
-    def setPreviousState(self, x_prev, y_prev, theta_prev):
+    def setPreviousState(self, x_prev, y_prev, theta_prev,
+                               x_dot_prev,y_dot_prev,theta_dot_prev):
         self.x_prev = x_prev
         self.y_prev = y_prev
-        self.theta = self.wrapAngle(theta_prev)
+        self.theta_prev = self.wrapAngle(theta_prev)
+        self.x_dot_prev = x_dot_prev
+        self.y_dot_prev = y_dot_prev
+        self.theta_dot_prev = theta_dot_prev
 
-    def vel_motion_model(self,u):
+    def velMotionModel(self,u):
         v = u[0]
         w = u[1]
         v_hat = v + (self.alpha1 * v**2 + self.alpha2 * w**2) * np.random.randn()
@@ -48,21 +61,23 @@ class UnicycleModel:
         self.x_prev = self.x
         self.y_prev = self.y
         self.theta_prev = self.theta
-        self.x = self.x + v_hat * np.cos(self.theta) * self.dt
-        self.y = self.y + v_hat * np.sin(self.theta) * self.dt
-        print("w: " , w)
-        print("w_hat: " , w_hat)
-        print("w_hat*self.dt: " , w_hat*self.dt)
-        print("prev theta: " , self.theta)
-        self.theta = self.wrapAngle(self.theta + w_hat*self.dt)
-        print("unwrapped theta: " , self.theta + w_hat*self.dt)
-        print("theta: " , self.theta)
+        self.x_dot_prev = self.x_dot
+        self.y_dot_prev = self.y_dot
+        self.theta_dot_prev = self.theta_dot
+        self.x_dot = v_hat * np.cos(self.theta)
+        self.y_dot = v_hat * np.sin(self.theta)
+        self.theta_dot = w_hat
+        self.x = self.x + self.x_dot * self.dt
+        self.y = self.y + self.y_dot * self.dt
+        self.theta = self.wrapAngle(self.theta + self.theta_dot * self.dt)
 
     def getState(self):
-        return np.array([self.x,self.y,self.theta])
+        return np.array([self.x,self.y,self.theta, 
+                         self.x_dot, self.y_dot, self.theta_dot])
 
     def getPreviousState(self):
-        return np.array([self.x_prev,self.y_prev,self.theta_prev])
+        return np.array([self.x_prev,self.y_prev, self.theta_prev,
+                         self.x_dot_prev, self.y_dot_prev, self.theta_dot_prev])
 
     def getPoints(self):
         R = self.getRotationMatrix(self.theta)

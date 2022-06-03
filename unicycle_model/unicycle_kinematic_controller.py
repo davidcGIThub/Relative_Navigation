@@ -5,7 +5,7 @@ Unicycle Kinematic Controller Class
 import numpy as np
 from scipy.optimize import fsolve
 
-class UnicycleKinematicController:
+class UnicycleKinematicWaypointTracker:
 
     def __init__(self, 
                  kp_xy = 1, 
@@ -22,10 +22,11 @@ class UnicycleKinematicController:
         self._v_max = v_max 
         self._omega_max = omega_max
         self._tolerance = tolerance
+        self._
         self._prev_v = 0
         self._prev_omega = 0
 
-    def pd_control(self, states, states_previous, states_desired, time_step):
+    def waypoint_tracker(self, states, states_previous, states_desired, time_step):
         x = states[0]
         y = states[1]
         theta = states[2]
