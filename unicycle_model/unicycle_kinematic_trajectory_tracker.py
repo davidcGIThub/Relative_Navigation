@@ -2,6 +2,7 @@
 Unicycle Kinematic Trajectory Tracker Class
 """
 
+from debugpy import trace_this_thread
 import numpy as np
 from scipy.optimize import fsolve
 
@@ -26,7 +27,7 @@ class UnicycleKinematicTrajectoryTracker:
         self._tolerance = tolerance
         self._previous_commands = np.array([0,0])
         self._previous_states = np.array([0,0,0.0,0.0,0.0,0.0])
-        self._previous_stated_desired = np.array([0.0,0.0,0.0,0.0,0.0,0.0])
+        self._previous_desired_states = np.array([0.0,0.0,0.0,0.0,0.0,0.0])
         self._integrators = np.array([0.0,0.0])
 
     def trajectory_tracker(self, states, states_desired):
@@ -36,14 +37,14 @@ class UnicycleKinematicTrajectoryTracker:
         angular_vel_command = self.p_angular_control(states, theta_des)
         self._previous_commands = np.array([velocity_command, angular_vel_command])
         self._previous_states = states
-        self._previous_stated_desired = states_desired
+        self._previous_desired_states = states_desired
         return velocity_command, angular_vel_command
 
     def set_previous_states(self, states):
         self._previous_states = states
 
     def set_previous_desired_states(self, states):
-        self._previous_stated_desired = states
+        self._previous_desired_states = states
 
     def set_previous_commands(self, commands):
         self._previous_commands = commands
@@ -51,22 +52,20 @@ class UnicycleKinematicTrajectoryTracker:
     def get_xy_velocity_command(self,states,states_desired):
         x = states[0]
         y = states[1]
-        x_dot = states[3]
-        y_dot = states[4]
-        x_prev = self._previous_states[0]
-        y_prev = self._previous_states[1]
         x_des = states_desired[0]
         y_des = states_desired[1]
         x_dot_des = states_desired[3]
         y_dot_des = states_desired[4]
-        x_des_prev = self._previous_stated_desired[0]
-        y_des_prev = self._previous_stated_desired[1]
-        x_position_term = self.pi_control(x, x_prev, x_des, x_des_prev, self._kp_p, self._kp_i, 0)
-        y_position_term = self.pi_control(y, y_prev, y_des, y_des_prev, self._kp_p, self._kp_i, 1)
-        x_vel_term = self.p_control(x_dot, x_dot_des, self._kv_p)
-        y_vel_term = self.p_control(y_dot, y_dot_des, self._kv_p)
-        x_vel_command = x_position_term + x_vel_term
-        y_vel_command = y_position_term + y_vel_term
+        # x_p_control_term = self.p_control(x, x_des, self._kp_p)
+        # y_p_control_term = self.p_control(y, y_des, self._kp_p)
+        x_prev = self._previous_states[0]
+        y_prev = self._previous_states[1]
+        x_des_prev = self._previous_desired_states[0]
+        y_des_prev = self._previous_desired_states[1]
+        x_p_control_term = self.pi_control(x, x_prev, x_des, x_des_prev, self._kp_p, self._kp_i, 0)
+        y_p_control_term = self.pi_control(y, y_prev, y_des, y_des_prev, self._kp_p, self._kp_i, 1)
+        x_vel_command = x_p_control_term + x_dot_des*self._kv_p
+        y_vel_command = y_p_control_term + y_dot_des*self._kv_p
         return x_vel_command, y_vel_command
 
     def get_velocity_command(self,x_vel_command, y_vel_command, states):
@@ -94,21 +93,24 @@ class UnicycleKinematicTrajectoryTracker:
         integrator_vector = np.zeros(2)
         integrator_vector[integrator_index] = integrator
         command = p_term + integrator
-        if (self._previous_commands[0] > self._v_max) and (np.sign(error + error_prev) == np.sign(integrator)):
-            pass
-        # elif np.abs(error) < self._tolerance:
-        #     self._integrators[integrator_index] = 0
+        # if (self._previous_commands[0] > self._v_max) and (np.sign(error + error_prev) == np.sign(integrator)):
+        #     pass
+        if np.abs(error) < self._tolerance:
+            self._integrators[integrator_index] = 0
         else:
             new_integrator = (self._dt * i_gain / 2) * (error + error_prev) + integrator
             self._integrators[integrator_index] = new_integrator
+        # print("new_integrator: " , new_integrator)
+        # print("integrators: " , self._integrators)
         return command
 
     def p_angular_control(self,states, theta_des):
         theta = states[2]
         theta_error = self.find_closest_angle_and_direction(theta,theta_des)
         angular_vel_command = theta_error*self._ktheta_p
-        angular_vel_command = self.low_pass_filter(angular_vel_command, self._previous_commands[1], 0.2)
+        # angular_vel_command = self.low_pass_filter(angular_vel_command, self._previous_commands[1], 0.8)
         angular_vel_command_sat = np.clip(angular_vel_command , -self._omega_max , self._omega_max)
+        print("angular_vel_command_sat: " , angular_vel_command_sat)
         return angular_vel_command_sat
 
     def find_closest_angle_and_direction(self, angle, desired_angle):
